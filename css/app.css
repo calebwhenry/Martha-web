@@ -552,3 +552,24 @@ textarea.input { min-height: 112px; resize: vertical; line-height: 1.55; }
   .about p.text.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 }
 @media (min-width: 561px) { .about [data-more] { display: none; } }
+
+/* Hot studies, fall aways, encouragements */
+.chip.hot { background: color-mix(in oklab, var(--rose) 16%, var(--surface)); color: var(--rose); }
+.chip.hot svg { flex: none; }
+#hot-panel .row-end { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 560px) { #hot-panel .row { flex-wrap: wrap; } #hot-panel .row-end { width: 100%; justify-content: flex-start; padding-left: 50px; } }
+.fa-list { display: grid; gap: 16px; }
+.fa-card { display: grid; gap: 16px; }
+.fa-head { display: flex; gap: 14px; align-items: center; }
+.fa-head h2 { overflow-wrap: anywhere; }
+.enc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.enc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; border-radius: 999px; font-weight: 600; font-size: 14px;
+  background: color-mix(in oklab, var(--rose) 12%, var(--surface)); color: var(--ink); border: 1px solid color-mix(in oklab, var(--rose) 28%, var(--line)); }
+.enc-chip button { border: 0; background: none; color: var(--muted); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.enc-chip button:active { transform: scale(0.94); }
+@media (hover: hover) and (pointer: fine) { .enc-chip button:hover { background: var(--surface-2); color: var(--ink); } }
+.enc-add { display: flex; gap: 8px; max-width: 460px; }
+.enc-add .input { min-height: 40px; }
+.seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { white-space: nowrap; flex: none; }
