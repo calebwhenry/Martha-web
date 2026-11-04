@@ -192,8 +192,22 @@
       summaries[sid] = { body, reportCount: rs.length, generatedAt: rs.map((r) => r.createdAt).sort().pop() };
     }
 
+    const encouragements = {
+      d1: ['Iced coffee', 'Handwritten notes', 'Pickup basketball'],
+      d7: ['Sunflowers', 'Matcha', 'Quality time'],
+      d8: ['Dark chocolate', 'Worship playlists'],
+      d2: ['Hot Cheetos'],
+    };
+    const fallAways = [
+      { personId: 'f1', chapter: 'ucr', displayName: 'Jordan Ellis', firstName: 'Jordan', gender: 'men', markedAt: new Date(Date.now() - 40 * 86400000).toISOString(),
+        phone: '+19515550150', talk: { id: 'bt-relentless', name: 'Relentless' }, spirthday: { m: 4, d: 9, y: 2023 },
+        notes: [{ id: 'n1', body: 'Started working weekends and stopped coming to church. Still open to hanging out.', createdAt: new Date(Date.now() - 38 * 86400000).toISOString(), author: { personId: 'd1', name: 'Caleb Henry' } }] },
+      { personId: 'f2', chapter: 'ucr', displayName: 'Maya Brooks', firstName: 'Maya', gender: 'women', markedAt: new Date(Date.now() - 95 * 86400000).toISOString(),
+        phone: '+19515550151', talk: { id: 'bt-harvest', name: 'Harvest' }, spirthday: { m: 2, d: 19, y: 2022 }, notes: [] },
+    ];
+
     return {
-      summaries,
+      summaries, encouragements, fallAways, hotIds: ['s2', 's13'],
       viewer: { personId: 'd1', chapters: ['ucr', 'cbu'], defaultChapter: 'ucr' },
       chapters: CHAPTERS, catalog: CATALOG, talks: TALKS, people, events, reports,
       devices: [

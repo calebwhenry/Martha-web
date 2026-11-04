@@ -21,6 +21,7 @@
   const genderLabel = (g) => (g === 'men' ? "Men's" : g === 'women' ? "Women's" : 'Group not confirmed');
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
   const myId = () => (state.me && state.me.personIdByChapter && state.me.personIdByChapter[state.chapter]) || (state.me && state.me.personId);
+  const canSeeFallAways = () => Boolean(state.chapterInfo && state.chapterInfo.canSeeFallAways);
   const tz = () => (state.chapterInfo && state.chapterInfo.timezone) || T.DEFAULT_TZ;
 
   const I = {
@@ -42,6 +43,8 @@
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',
     x: '<path d="M6 6l12 12M18 6 6 18"/>',
     swap: '<path d="M7 7h11l-3-3M17 17H6l3 3"/>',
+    flame: '<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.2 2.2-5.4 3.6-7.3.4 1.7 1.3 2.9 2.4 3.4.2-2.9 1.6-5.6 3.6-7.4.3 3.1 3.4 5.4 3.4 10.1 0 4.1-2.6 7.4-6.5 7.4z"/>',
+    leaf: '<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zM5 19l7-7"/>',
   };
   const icon = (n) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
@@ -78,6 +81,7 @@
     journey: null,
     cal: { week: null, men: true, women: true, hiddenTalks: new Set() },
     students: { q: '', gender: 'all', status: 'all' },
+    hot: { gender: 'all', talk: 'all' },
     disciples: { q: '' },
     signin: { step: 'phone', phone: '', error: '', busy: false },
   };
@@ -87,7 +91,7 @@
     for (const [prefix, name] of [['student-', 'student'], ['disciple-', 'disciple'], ['schedule-', 'schedule']]) {
       if (h.startsWith(prefix)) return { name, id: h.slice(prefix.length) };
     }
-    if (['students', 'disciples', 'calendar', 'schedule'].includes(h)) return { name: h };
+    if (['students', 'disciples', 'calendar', 'schedule', 'fall-aways'].includes(h)) return { name: h };
     return { name: 'home' };
   }
   const go = (hash) => { if (location.hash === '#' + hash) render(); else location.hash = hash; };
@@ -97,6 +101,7 @@
   function navSection(route) {
     if (route.name === 'student') return 'students';
     if (route.name === 'disciple') return 'disciples';
+    if (route.name === 'fall-aways') return 'fall-aways';
     return route.name;
   }
 
@@ -108,14 +113,16 @@
 
   function renderShell(route) {
     const cur = navSection(route);
-    const links = (cls) => NAV.map(([id, text, ic]) => `<a href="#${id}" ${cur === id ? 'aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`).join('');
+    const link = ([id, text, ic]) => `<a href="#${id}" ${cur === id ? 'aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
+    const links = () => NAV.map(link).join('');
+    const railLinks = () => links() + (canSeeFallAways() ? link(['fall-aways', 'Fall aways', 'leaf']) : '');
     const demo = API.mode === 'demo' ? `<div class="demo-banner" role="note"><strong>Demo mode.</strong> <span>Sample people and studies only. Nothing is saved to Martha.</span></div>` : '';
     document.getElementById('app').innerHTML = `
       ${demo}
       <div class="shell">
         <aside class="rail">
           <a class="wordmark" href="#home"><i></i>Martha</a>
-          <nav class="nav" aria-label="Main">${links()}</nav>
+          <nav class="nav" aria-label="Main">${railLinks()}</nav>
           <div class="rail-foot">
             <div>${chapterControl()}</div>
             <button class="account-btn" data-action="account"><span class="avatar">${esc(initials(state.me.displayName))}</span><span>${esc(state.me.displayName)}</span></button>
@@ -163,7 +170,7 @@
     window.scrollTo(0, 0);
     const view = $('#view');
     view.innerHTML = skeleton();
-    const views = { home: viewHome, students: viewStudents, student: viewStudent, disciples: viewDisciples, disciple: viewDisciple, calendar: viewCalendar, schedule: viewSchedule };
+    const views = { home: viewHome, students: viewStudents, student: viewStudent, disciples: viewDisciples, disciple: viewDisciple, calendar: viewCalendar, schedule: viewSchedule, 'fall-aways': viewFallAways };
     try {
       await views[route.name](view, route, () => seq === renderSeq);
     } catch (e) {
@@ -171,7 +178,7 @@
       if (e.status === 401) return render();
       view.innerHTML = errorBox(e);
     }
-    const titleBits = { home: 'Home', students: 'Students', student: 'Student', disciples: 'Disciples', disciple: 'Disciple', calendar: 'Calendar', schedule: 'Schedule' };
+    const titleBits = { 'fall-aways': 'Fall aways', home: 'Home', students: 'Students', student: 'Student', disciples: 'Disciples', disciple: 'Disciple', calendar: 'Calendar', schedule: 'Schedule' };
     document.title = `${titleBits[route.name]} · Martha`;
   }
 
@@ -277,15 +284,78 @@
       </div>
     </section>`;
 
+    const hotSection = `<section class="panel w12" aria-labelledby="h-hot" id="hot-panel">${hotHTML(o)}</section>`;
+    state.overview = o;
     view.innerHTML = `
       <div class="page-head"><div><h1>${greeting()}, ${esc(state.me.firstName)}</h1><p class="sub">${esc(todayLong)} · ${esc(o.chapter.name)} · ${plural(o.disciples, 'disciple')}</p></div>
       <a class="btn" href="#schedule">${icon('plus')}Schedule a study</a></div>
       ${installTip()}
       <div class="dash">
         ${hero}${talks || upcoming}
+        ${hotSection}
         ${talks ? upcoming : ''}${o.talks ? quiet : quiet.replace('panel w5', 'panel w6')}
         ${dates}
       </div>`;
+  }
+
+  function hotHTML(o) {
+    const H = state.hot;
+    const all = o.hot || [];
+    const talks = o.talks || [];
+    const rows = all.filter((r) => (H.gender === 'all' || r.gender === H.gender)
+      && (H.talk === 'all' || (H.talk === 'none' ? !r.talk : r.talk && r.talk.id === H.talk)));
+    const talkBtns = talks.length ? `<div class="seg" role="group" aria-label="Bible Talk">${[['all', 'All Talks'], ...talks.map((t) => [t.id, t.name]), ['none', 'No Talk']]
+      .map(([v, t]) => `<button data-hottalk="${esc(v)}" aria-pressed="${H.talk === v}">${esc(t)}</button>`).join('')}</div>` : '';
+    return `<div class="section">
+      <div class="section-head"><h2 id="h-hot">Hot studies</h2><span class="small muted">${plural(rows.length, 'student')}</span></div>
+      <p class="small muted">Students past Discipleship, plus anyone a disciple marked hot. Studied in the last 30 days or scheduled.</p>
+      <div class="toggle-row">
+        <div class="seg" role="group" aria-label="Men or women">${[['all', 'All'], ['men', 'Men'], ['women', 'Women']].map(([v, t]) => `<button data-hotgender="${v}" aria-pressed="${H.gender === v}">${t}</button>`).join('')}</div>
+        ${talkBtns}
+      </div>
+      ${rows.length ? `<div class="list" style="border:0;border-radius:0;background:none">${rows.map((r) => `
+        <a class="row" style="padding-inline:0" href="#student-${encodeURIComponent(r.personId)}">
+          <span class="avatar ${r.gender || ''}">${esc(initials(r.displayName))}</span>
+          <span class="row-main">
+            <span class="row-title">${esc(r.displayName)}</span>
+            <span class="row-sub">${esc(r.nextStudy ? `Next: ${r.nextStudy.title}, ${T.relativeDay(r.nextStudy.startsAt, tz())}` : r.lastStudy ? `Last: ${r.lastStudy.title}, ${T.relativeDay(r.lastStudy.startsAt, tz()).toLowerCase()}` : '')}${r.talk ? ' · ' + esc(r.talk.name) : ''}</span>
+          </span>
+          <span class="row-end">${miniPath(r.progress)}${r.hot ? `<span class="chip hot">${icon('flame').replace('<svg', '<svg width="13" height="13"')}Hot</span>` : ''}${r.pastDiscipleship ? '<span class="chip accent">Past Discipleship</span>' : ''}</span>
+        </a>`).join('')}</div>` : `<div class="empty"><strong>No hot studies ${H.gender !== 'all' || H.talk !== 'all' ? 'match these filters' : 'right now'}</strong><span>Students show here once they're past Discipleship or a disciple marks them hot.</span></div>`}
+    </div>`;
+  }
+
+  // ---------- Fall aways ----------
+  async function viewFallAways(view, route, live) {
+    if (!canSeeFallAways()) {
+      view.innerHTML = `<div class="state-box"><h3>Leaders only</h3><p class="muted">Fall aways are visible to admins, the coordinator and Bible Talk leaders and co-leaders.</p><a class="btn ghost sm" href="#home">Go home</a></div>`;
+      return;
+    }
+    const list = await API.fallAways(state.chapter);
+    if (!live()) return;
+    view.innerHTML = `
+      <div class="page-head"><div><h1>Fall aways</h1><p class="sub">${plural(list.length, 'disciple')} marked as fallen away in ${esc(state.chapterInfo.name)}. Only leaders can see this page.</p></div></div>
+      ${list.length ? `<div class="fa-list">${list.map((f) => `
+        <article class="panel fa-card" data-fa="${esc(f.personId)}">
+          <div class="fa-head">
+            <span class="avatar ${f.gender || ''}">${esc(initials(f.displayName))}</span>
+            <div style="min-width:0"><h2>${esc(f.displayName)}</h2>
+              <p class="small muted">${f.markedAt ? `Marked fell away ${esc(T.formatDate(f.markedAt, tz(), 'long'))}` : 'Date not recorded'}${f.talk ? ' · ' + esc(f.talk.name) : ''}</p></div>
+          </div>
+          <dl class="node-facts">
+            <dt>Phone</dt><dd>${f.phone ? `<span class="num">${esc(prettyPhone(f.phone))}</span> <button class="copy-btn" data-copy="${esc(prettyPhone(f.phone))}">Copy</button>` : '<span class="muted">Not recorded</span>'}</dd>
+            <dt>Spirthday</dt><dd>${f.spirthday ? esc(T.monthDay(f.spirthday.m, f.spirthday.d, f.spirthday.y)) : '<span class="muted">Not recorded</span>'}</dd>
+          </dl>
+          <div class="report">
+            <h3>Why they fell away</h3>
+            ${f.notes.length ? f.notes.map((n) => `<div><p class="report-body">${esc(n.body)}</p><p class="report-meta">${n.author ? esc(n.author.name) : 'Author not recorded'} · ${esc(T.formatDate(n.createdAt, tz(), 'medium'))}</p></div>`).join('') : '<p class="small muted">No notes yet.</p>'}
+          </div>
+          <form class="form" data-fa-note="${esc(f.personId)}">
+            <div class="field"><label for="fa-${esc(f.personId)}">Add a note</label>
+              <textarea class="input" id="fa-${esc(f.personId)}" name="body" required maxlength="4000" placeholder="What happened? What might help if they come back?"></textarea></div>
+            <div><button class="btn sm" type="submit">Save note</button></div>
+          </form>
+        </article>`).join('')}</div>` : `<div class="list"><div class="empty"><strong>No one is marked as fallen away</strong><span>When an admin tells Martha a disciple fell away, they'll show here.</span></div></div>`}`;
   }
 
   // ---------- Students ----------
@@ -614,7 +684,7 @@
   async function viewDisciples(view, route, live) {
     const s = state.disciples;
     view.innerHTML = `
-      <div class="page-head"><div><h1>Disciples</h1><p class="sub" id="d-count">${esc(state.chapterInfo.name)}</p></div></div>
+      <div class="page-head"><div><h1>Disciples</h1><p class="sub" id="d-count">${esc(state.chapterInfo.name)}</p></div>${canSeeFallAways() ? `<a class="btn ghost" href="#fall-aways">${icon('leaf')}Fall aways</a>` : ''}</div>
       <div class="search">${icon('search')}<input class="input" id="disciple-search" type="search" placeholder="Search disciples by name or nickname" value="${esc(s.q)}" autocomplete="off" aria-label="Search disciples"></div>
       <div id="disciple-list">${skeleton(5)}</div>`;
     const draw = (rows) => {
@@ -664,6 +734,7 @@
         ${state.chapterInfo.bibleTalksEnabled ? `<div class="fact"><dt>Bible Talk</dt><dd>${p.talk ? esc(p.talk.name) : '<span class="muted">Not assigned</span>'}</dd></div>` : ''}
         <div class="fact"><dt>Last 30 days</dt><dd class="num">Led ${p.ledLast30}, set up ${p.setUpLast30}</dd></div>
       </dl>
+      <section class="about" id="enc" aria-labelledby="h-enc">${encHTML(p)}</section>
       <div class="dash">
         <section class="panel w7" style="padding:0">
           <div style="padding:20px 20px 8px"><h2>Upcoming studies</h2></div>
@@ -677,6 +748,18 @@
         </section>
       </div>
       <div><button class="btn ghost" data-action="help-signin" data-person="${esc(p.personId)}" data-name="${esc(p.firstName)}">${icon('send')}Help ${esc(p.firstName)} sign in</button></div>`;
+  }
+
+  function encHTML(p) {
+    const items = p.encouragements || [];
+    return `<div class="about-head"><h2 id="h-enc">What encourages ${esc(p.firstName)}</h2><span class="meta">Anyone can add to this, here or by telling Martha</span></div>
+      ${items.length ? `<div class="enc-chips">${items.map((it) => `<span class="enc-chip">${esc(it)}<button data-enc-remove="${esc(it)}" aria-label="Remove ${esc(it)}">${icon('x').replace('<svg', '<svg width="13" height="13"')}</button></span>`).join('')}</div>`
+        : `<p class="muted">Nothing saved yet. Martha will ask ${esc(p.firstName)} on Telegram, or you can add something.</p>`}
+      <form class="enc-add" data-enc-add="${esc(p.personId)}">
+        <label class="sr-only" for="enc-input">Something that encourages ${esc(p.firstName)}</label>
+        <input class="input" id="enc-input" name="enc_item" maxlength="80" autocomplete="off" placeholder="Add something, like iced coffee" required>
+        <button class="btn sm" type="submit">Add</button>
+      </form>`;
   }
 
   // ---------- Calendar ----------
@@ -982,6 +1065,7 @@
     openSheet(`${sheetHead(state.me.displayName)}
       <div class="menu-list">
         <button class="menu-item" data-action="help-signin">${icon('send')}<span>Help a disciple sign in<small>Martha sends them a code on Telegram</small></span></button>
+        ${canSeeFallAways() ? `<a class="menu-item" href="#fall-aways" data-close>${icon('leaf')}<span>Fall aways<small>Leaders only</small></span></a>` : ''}
         <button class="menu-item" data-action="devices">${icon('device')}<span>My devices<small>See where you're signed in</small></span></button>
         <a class="menu-item" href="${esc(CFG.telegramBot)}" target="_blank" rel="noopener">${icon('chat')}<span>Open Martha on Telegram<small>@martha_management_bot</small></span></a>
         <button class="menu-item" data-action="signout">${icon('out')}<span>Sign out of this device</span></button>
@@ -1109,6 +1193,18 @@
       if (a === 'change-number') { state.signin = { step: 'phone', phone: '', error: '', busy: false }; renderSignIn(); }
       return;
     }
+    const hg = t.closest('[data-hotgender]'); const ht = t.closest('[data-hottalk]');
+    if ((hg || ht) && state.overview) {
+      if (hg) state.hot.gender = hg.dataset.hotgender; else state.hot.talk = ht.dataset.hottalk;
+      $('#hot-panel').innerHTML = hotHTML(state.overview); return;
+    }
+    const er = t.closest('[data-enc-remove]');
+    if (er) {
+      const pid = parseRoute().id; er.disabled = true;
+      try { const r = await API.removeEncouragement(state.chapter, pid, er.dataset.encRemove); toast(r.message || 'Removed.'); const p = await API.person(state.chapter, pid); $('#enc').innerHTML = encHTML(p); }
+      catch (e2) { toast(e2.message); er.disabled = false; }
+      return;
+    }
     const ch = t.closest('[data-chapter]');
     if (ch) { state.chapter = ch.dataset.chapter; ls.set('martha.chapter', state.chapter); state.cal.hiddenTalks.clear(); closeSheet(); go('home'); render(); return; }
     const rv = t.closest('[data-revoke]');
@@ -1155,6 +1251,22 @@
   });
 
   document.addEventListener('submit', async (ev) => {
+    const enc = ev.target.closest('form[data-enc-add]');
+    if (enc) {
+      ev.preventDefault();
+      const pid = enc.dataset.encAdd; const btn = enc.querySelector('button'); btn.disabled = true;
+      try { const r = await API.addEncouragement(state.chapter, pid, enc.elements.enc_item.value); toast(r.message || 'Saved.'); const p = await API.person(state.chapter, pid); $('#enc').innerHTML = encHTML(p); $('#enc-input') && $('#enc-input').focus(); }
+      catch (e2) { toast(e2.message); btn.disabled = false; }
+      return;
+    }
+    const fa = ev.target.closest('form[data-fa-note]');
+    if (fa) {
+      ev.preventDefault();
+      const btn = fa.querySelector('button'); btn.disabled = true; btn.textContent = 'Saving…';
+      try { await API.addFallAwayNote(state.chapter, fa.dataset.faNote, fa.elements.body.value); toast('Note saved.'); render(); }
+      catch (e2) { toast(e2.message); btn.disabled = false; btn.textContent = 'Save note'; }
+      return;
+    }
     const form = ev.target.closest('form[data-report]');
     if (!form) return;
     ev.preventDefault();

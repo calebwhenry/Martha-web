@@ -148,7 +148,7 @@
       async me() {
         requireSession();
         const p = person(db.viewer.personId);
-        return wait({ personId: p.personId, displayName: p.displayName, firstName: p.firstName, chapters: db.chapters.filter((c) => db.viewer.chapters.includes(c.id)), defaultChapter: db.viewer.defaultChapter });
+        return wait({ personId: p.personId, displayName: p.displayName, firstName: p.firstName, chapters: db.chapters.filter((c) => db.viewer.chapters.includes(c.id)).map((c) => ({ ...c, canSeeFallAways: true })), defaultChapter: db.viewer.defaultChapter });
       },
 
       async overview(ch) {
@@ -182,7 +182,21 @@
           }
         }
         dates.sort((a, b) => a.inDays - b.inDays);
+        const discOrder = db.catalog.find((c) => c.key === 'discipleship').order;
+        const recent = new Date(Date.now() - 30 * 86400000).toISOString();
+        const hot = students.filter((s) => {
+          const evs = studentEvents(s.p.personId);
+          const past = evs.some((e) => (db.catalog.find((c) => c.key === e.studyKey) || {}).order > discOrder);
+          const isHot = db.hotIds.includes(s.p.personId);
+          s.flags = { past, isHot };
+          return (past || isHot) && (s.a.nextStudy || (s.a.lastStudy && s.a.lastStudy.startsAt >= recent));
+        }).map((s) => {
+          const t = talk(s.a.talkId);
+          return { personId: s.p.personId, displayName: s.p.displayName, gender: s.p.gender, hot: s.flags.isHot, pastDiscipleship: s.flags.past, active: s.a.active,
+            talk: t ? { id: t.id, name: t.name, tone: t.tone } : null, lastStudy: s.a.lastStudy, nextStudy: s.a.nextStudy, progress: progress(s.p.personId) };
+        }).sort((a, b) => b.progress.filter((x) => x.state === 'done').length - a.progress.filter((x) => x.state === 'done').length);
         return wait({
+          hot,
           chapter,
           activeStudies: { total: active.length, men: active.filter((s) => s.p.gender === 'men').length, women: active.filter((s) => s.p.gender === 'women').length },
           talks, weekCount: week.length, weekDone: week.filter((e) => e.startsAt <= nowIso).length, upcoming, quiet, dates,
@@ -218,6 +232,7 @@
           out.setUpLast30 = mine.filter((e) => e.organizerId === id && e.startsAt >= since && e.startsAt <= nowIso).length;
           const studentIds = [...new Set(mine.filter((e) => e.startsAt >= since || e.endsAt > nowIso).map((e) => e.studentId))];
           out.studyingWith = studentIds.map((sid) => personSummary(person(sid)));
+          out.encouragements = [...(db.encouragements[id] || [])];
         }
         return wait(out);
       },
@@ -278,6 +293,32 @@
         if (!e) throw new ApiError('not_found', 'That study no longer exists.', 404);
         e.status = 'cancelled';
         return wait({ ok: true }, 350);
+      },
+
+      async fallAways(ch) {
+        requireSession(); requireChapter(ch);
+        return wait(db.fallAways.filter((f) => f.chapter === ch));
+      },
+      async addFallAwayNote(ch, id, body) {
+        const f = db.fallAways.find((x) => x.personId === id);
+        if (!f) throw new ApiError('not_found', "That disciple isn't on the fall-away list.", 404);
+        if (!String(body || '').trim()) throw new ApiError('bad_note', 'Write a note first.', 400);
+        f.notes.push({ id: `n${Date.now()}`, body: body.trim(), createdAt: now(), author: ref(db.viewer.personId) });
+        return wait({ ok: true }, 250);
+      },
+      async addEncouragement(ch, id, item) {
+        const it = String(item || '').trim().replace(/\s+/g, ' ');
+        if (!it || it.length > 80) throw new ApiError('bad_item', 'Keep it short: up to 80 characters.', 400);
+        const list = db.encouragements[id] || (db.encouragements[id] = []);
+        const p = person(id);
+        if (list.some((x) => x.toLowerCase() === it.toLowerCase())) return wait({ items: list, message: `Already on ${p.firstName}'s list` }, 200);
+        list.push(it);
+        return wait({ items: list, message: `Saved for ${p.firstName}: ${it}` }, 250);
+      },
+      async removeEncouragement(ch, id, item) {
+        const list = db.encouragements[id] || [];
+        db.encouragements[id] = list.filter((x) => x.toLowerCase() !== String(item).toLowerCase());
+        return wait({ items: db.encouragements[id], message: `Removed: ${item}` }, 200);
       },
 
       async saveReport(ch, eventId, { outcome, body }) {
@@ -359,6 +400,10 @@
       scheduleStudy: (ch, f) => call(`/m/${ch}/studies`, { method: 'POST', body: f }),
       removeStudy: (ch, id) => call(`/m/${ch}/studies/${encodeURIComponent(id)}`, { method: 'DELETE' }),
       saveReport: (ch, id, r) => call(`/m/${ch}/studies/${encodeURIComponent(id)}/report`, { method: 'POST', body: r }),
+      fallAways: (ch) => call(`/m/${ch}/fall-aways`),
+      addFallAwayNote: (ch, id, body) => call(`/m/${ch}/fall-aways/${encodeURIComponent(id)}/notes`, { method: 'POST', body: { body } }),
+      addEncouragement: (ch, id, item) => call(`/m/${ch}/people/${encodeURIComponent(id)}/encouragements`, { method: 'POST', body: { item } }),
+      removeEncouragement: (ch, id, item) => call(`/m/${ch}/people/${encodeURIComponent(id)}/encouragements${q({ item })}`, { method: 'DELETE' }),
     };
   }
 
