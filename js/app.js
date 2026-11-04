@@ -394,7 +394,7 @@
 
   function nodeState(e) {
     const now = new Date().toISOString();
-    if (e.source === 'imported') return { cls: 'imported', badge: 'Imported' };
+    if (e.source === 'imported') return { cls: 'completed', badge: 'Earlier record' };
     if (e.status === 'pending_sync') return { cls: 'pending', badge: 'Adding to calendar' };
     if (e.status === 'sync_error') return { cls: 'pending', badge: 'Calendar problem' };
     if (e.startsAt > now) return { cls: 'scheduled', badge: 'Scheduled' };
@@ -443,7 +443,8 @@
 
     let report = '';
     if (e.source === 'imported') {
-      report = `<div class="notice">${icon('info')}<span>Imported from Martha's earlier records. Whether this study was finished wasn't recorded.</span></div>`;
+      report = (e.report ? `<div class="report"><div class="report-head"><h3>Report</h3></div><p class="report-body">${esc(e.report.body)}</p><p class="report-meta">${e.report.author ? esc(e.report.author.name) : 'Author not recorded'} · ${esc(T.formatDate(e.report.createdAt, tz(), 'medium'))}</p></div>` : '')
+        + `<p class="report-meta">From Martha's earlier records, before reports recorded "finished" or "partway."</p>`;
     } else if (future) {
       report = e.status === 'pending_sync' ? `<div class="notice warn">${icon('info')}<span>Martha is adding this to the ${esc(genderLabel(e.audience))} Google Calendar.</span></div>` : '';
     } else if (e.report && !J.editing.has(e.id)) {

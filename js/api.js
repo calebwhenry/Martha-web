@@ -24,7 +24,8 @@
   }
 
   function suggestNext(catalog, events) {
-    const relevant = events.filter((e) => e.status !== 'cancelled').sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    // "Other" studies never move the series forward.
+    const relevant = events.filter((e) => e.status !== 'cancelled' && e.studyKey !== 'other').sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     const last = relevant[relevant.length - 1];
     if (!last) return { key: 'intro', part: 1 };
     if (last.outcome === 'partial') return { key: last.studyKey, part: (last.part || 1) + 1 };
@@ -57,7 +58,8 @@
       const r = latestReport(e.id);
       const t = talk(e.talkId);
       return {
-        id: e.id, chapter: e.chapter, studyKey: e.studyKey, part: e.part, title: studyLabel(db.catalog, e.studyKey, e.part),
+        id: e.id, chapter: e.chapter, studyKey: e.studyKey, part: e.part, customTitle: e.customTitle || null,
+        title: e.studyKey === 'other' ? `${e.customTitle || 'Other study'}${e.part > 1 ? ` part ${e.part}` : ''}` : studyLabel(db.catalog, e.studyKey, e.part),
         startsAt: e.startsAt, endsAt: e.endsAt, status: e.status, audience: e.audience, source: e.source, outcome: e.outcome,
         student: ref(e.studentId), leader: ref(e.leaderId), organizer: ref(e.organizerId), talk: t ? { id: t.id, name: t.name, tone: t.tone } : null,
         location: e.location,
@@ -206,6 +208,7 @@
           const first = evs[0];
           out.firstSetUpBy = first ? ref(first.organizerId) : null;
           out.firstStudyAt = first ? first.startsAt : null;
+        out.summary = db.summaries[id] || null;
         } else {
           const nowIso = now();
           const mine = db.events.filter((e) => e.chapter === ch && e.status !== 'cancelled' && (e.leaderId === id || e.organizerId === id));
@@ -260,7 +263,7 @@
         const student = person(studentId);
         const org = person(f.organizerId);
         const e = {
-          id: `e${db.events.length + 1000}`, chapter: ch, studyKey: f.studyKey, part: f.part || 1, startsAt: f.startsAt, endsAt: f.endsAt,
+          id: `e${db.events.length + 1000}`, chapter: ch, studyKey: f.studyKey, customTitle: f.customTitle || null, part: f.part || 1, startsAt: f.startsAt, endsAt: f.endsAt,
           status: 'pending_sync', audience: student.gender, studentId, leaderId: f.leaderId, organizerId: f.organizerId,
           talkId: org ? org.talkId : null, createdById: db.viewer.personId, location: f.location || null, source: 'martha', outcome: null,
         };
@@ -283,10 +286,23 @@
         if (!e) throw new ApiError('not_found', 'That study no longer exists.', 404);
         const prev = latestReport(eventId);
         e.outcome = outcome;
+        let summaryUpdating = false;
         if (body && body.trim()) {
           db.reports.push({ id: `r${db.reports.length + 1000}`, eventId, body: body.trim(), authorId: db.viewer.personId, createdAt: now(), supersedesId: prev ? prev.id : null });
+          // Demo stand-in for Martha rewriting the summary from every report on file.
+          summaryUpdating = true;
+          const sid = e.studentId;
+          setTimeout(() => {
+            const count = db.events.filter((x) => x.studentId === sid && latestReport(x.id)).length;
+            const prevSummary = db.summaries[sid];
+            const who = person(sid);
+            db.summaries[sid] = {
+              body: prevSummary ? prevSummary.body : `${who.firstName} is just getting started. ${body.trim().split(/(?<=[.!?])\s/)[0]}`,
+              reportCount: count, generatedAt: now(),
+            };
+          }, 2600);
         }
-        return wait({ event: eventDTO(e) }, 350);
+        return wait({ event: eventDTO(e), summaryUpdating }, 350);
       },
     };
   }

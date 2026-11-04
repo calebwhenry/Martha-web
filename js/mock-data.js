@@ -168,7 +168,32 @@
       }
     }
 
+    const SUMMARIES = {
+      s1: 'Ethan grew up going to church now and then but had never read the Bible on his own. He asks a lot of honest questions, especially about prayer, and has become noticeably more engaged over the last few weeks. He has started reading daily in Matthew and is weighing what a real commitment to discipleship would mean.',
+      s2: 'Ava reads every morning and comes to each study with a verse that stood out to her. She is thoughtful and steady, and the idea that the Bible is meant to be obeyed, not just read, has stuck with her.',
+      s3: 'Noah is a transfer student who doesn\'t know many people at UCR yet. His first study went well and he was invited to Bible Talk, but he hasn\'t studied since.',
+      s4: 'Mia has been studying consistently since August and has worked through almost the whole series, including Truth and New Covenant Conversion, which she asked for herself. She takes notes in every study, has been honest about pushback from her family, and said the Cross study was the first time the cross felt personal. She wants to be part of the church and is excited to serve.',
+      s5: 'Lucas is curious and has a lot of questions about prayer, which slowed down his Seeking God study in a good way. He is open and wants to keep going.',
+      s7: 'Jacob moved steadily through the first four studies and took the idea of daily Bible reading seriously. Discipleship felt like a big commitment to him, and he hasn\'t studied in a few weeks.',
+      s8: 'Zoe has been studying every week since September. She connects what she reads to putting God first and has shared openly about pushback she has gotten for her faith.',
+      s9: 'Daniel had a good first study and was open from the start. He has had one more study since, with no report yet.',
+      s10: 'Lily has older studies from Martha\'s imported records. Since returning, she has committed to daily reading and is studying Discipleship next.',
+      s11: 'Samuel has studied every week for over a month and is moving quickly through the series. He connected the parables in Matthew 13 to wanting to put God first.',
+      s12: 'Emma has been consistent and engaged, and she is taking the series seriously. She linked the Kingdom study to the church and is studying Persecution next.',
+      s13: 'Owen has had two good studies and reads between them. Word of God is next.',
+      s15: 'Ben had a strong first study at CBU and is studying Seeking God next.',
+      s16: 'Abby had her first study this week and was very open.',
+    };
+    const summaries = {};
+    for (const [sid, body] of Object.entries(SUMMARIES)) {
+      const evIds = events.filter((e) => e.studentId === sid).map((e) => e.id);
+      const rs = reports.filter((r) => evIds.includes(r.eventId));
+      if (!rs.length) continue;
+      summaries[sid] = { body, reportCount: rs.length, generatedAt: rs.map((r) => r.createdAt).sort().pop() };
+    }
+
     return {
+      summaries,
       viewer: { personId: 'd1', chapters: ['ucr', 'cbu'], defaultChapter: 'ucr' },
       chapters: CHAPTERS, catalog: CATALOG, talks: TALKS, people, events, reports,
       devices: [
