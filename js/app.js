@@ -119,6 +119,7 @@
     const demo = API.mode === 'demo' ? `<div class="demo-banner" role="note"><strong>Demo mode.</strong> <span>Sample people and studies only. Nothing is saved to Martha.</span></div>` : '';
     document.getElementById('app').innerHTML = `
       ${demo}
+      <div class="atmosphere" aria-hidden="true"></div>
       <div class="shell">
         <aside class="rail">
           <a class="wordmark" href="#home"><i></i>Martha</a>
@@ -217,16 +218,32 @@
     const maxTalk = o.talks ? Math.max(1, ...o.talks.map((t) => t.activeStudents)) : 1;
     const todayLong = new Intl.DateTimeFormat('en-US', { timeZone: tz(), weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
 
+    // Activity ring (men / women share of active studies), drawn like a fitness ring.
+    const RC = 2 * Math.PI * 70;
+    const arc = (cls, start, share, both) => {
+      if (share <= 0) return '';
+      const len = both ? Math.max(0.01, RC * share - 21) : RC;
+      return `<circle class="arc ${cls}" cx="84" cy="84" r="70" stroke-dasharray="${len.toFixed(2)} ${RC.toFixed(2)}" stroke-dashoffset="${(-(RC * start + (both ? 10.5 : 0))).toFixed(2)}"/>`;
+    };
+    const mShare = a.total ? a.men / a.total : 0, wShare = a.total ? a.women / a.total : 0, both = a.men > 0 && a.women > 0;
+    const pctText = (n) => (a.total ? `${Math.round((n / a.total) * 100)}%` : '');
     const hero = `<section class="panel stat-hero w5" aria-labelledby="h-active">
       <h2 id="h-active">Active Bible studies</h2>
-      <div class="big-row"><span class="big num">${a.total}</span><span class="big-label muted">${a.total === 1 ? 'student' : 'students'} studying</span></div>
-      <div class="split">
-        <div class="split-bar" role="img" aria-label="${a.men} men, ${a.women} women">
-          ${a.men ? `<span class="men" style="width:${pct(a.men)}%"></span>` : ''}${a.women ? `<span class="women" style="width:${pct(a.women)}%"></span>` : ''}
+      <div class="hero-body">
+        <div class="ring" role="img" aria-label="${a.total} ${a.total === 1 ? 'student' : 'students'} studying: ${a.men} men, ${a.women} women">
+          <svg viewBox="0 0 168 168" aria-hidden="true">
+            <defs>
+              <linearGradient id="ring-men" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:color-mix(in oklab, var(--men) 55%, white)"/><stop offset="1" style="stop-color:var(--men)"/></linearGradient>
+              <linearGradient id="ring-women" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:color-mix(in oklab, var(--women) 55%, white)"/><stop offset="1" style="stop-color:var(--women)"/></linearGradient>
+            </defs>
+            <circle class="track" cx="84" cy="84" r="70"/>
+            ${arc('men', 0, mShare, both)}${arc('women', mShare, wShare, both)}
+          </svg>
+          <div class="ring-center"><span class="big num">${a.total}</span><span class="big-label">${a.total === 1 ? 'student' : 'students'} studying</span></div>
         </div>
         <div class="split-legend">
-          <div><b class="num">${a.men}</b><span><i style="background:var(--men)"></i>Men</span></div>
-          <div><b class="num">${a.women}</b><span><i style="background:var(--women)"></i>Women</span></div>
+          <div><b class="num">${a.men}</b><span><i style="background:var(--men)"></i>Men</span><em>${pctText(a.men)}</em></div>
+          <div><b class="num">${a.women}</b><span><i style="background:var(--women)"></i>Women</span><em>${pctText(a.women)}</em></div>
         </div>
       </div>
       <p class="def">Students with a study in the last 14 days or one on the calendar.</p>
@@ -287,7 +304,7 @@
     const hotSection = `<section class="panel w12" aria-labelledby="h-hot" id="hot-panel">${hotHTML(o)}</section>`;
     state.overview = o;
     view.innerHTML = `
-      <div class="page-head"><div><h1>${greeting()}, ${esc(state.me.firstName)}</h1><p class="sub">${esc(todayLong)} · ${esc(o.chapter.name)} · ${plural(o.disciples, 'disciple')}</p></div>
+      <div class="page-head"><div><p class="eyebrow">${esc(todayLong)}</p><h1>${greeting()}, ${esc(state.me.firstName)}</h1><p class="sub">${esc(o.chapter.name)} · ${plural(o.disciples, 'disciple')}</p></div>
       <a class="btn" href="#schedule">${icon('plus')}Schedule a study</a></div>
       ${installTip()}
       <div class="dash">
