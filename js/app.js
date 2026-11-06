@@ -45,6 +45,8 @@
     swap: '<path d="M7 7h11l-3-3M17 17H6l3 3"/>',
     flame: '<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.2 2.2-5.4 3.6-7.3.4 1.7 1.3 2.9 2.4 3.4.2-2.9 1.6-5.6 3.6-7.4.3 3.1 3.4 5.4 3.4 10.1 0 4.1-2.6 7.4-6.5 7.4z"/>',
     leaf: '<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zM5 19l7-7"/>',
+    pause: '<circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/>',
+    drop: '<path d="M12 3.5s-6 6.4-6 10.6a6 6 0 0 0 12 0C18 9.9 12 3.5 12 3.5z"/><path d="M9.5 14.5a2.6 2.6 0 0 0 2.5 2.5"/>',
   };
   const icon = (n) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
@@ -392,14 +394,14 @@
       <div class="search">${icon('search')}<input class="input" id="student-search" type="search" placeholder="Search students by name" value="${esc(s.q)}" autocomplete="off" aria-label="Search students"></div>
       <div class="toggle-row">
         <div class="seg" role="group" aria-label="Men or women">${[['all', 'All'], ['men', 'Men'], ['women', 'Women']].map(([v, t]) => `<button data-sgender="${v}" aria-pressed="${s.gender === v}">${t}</button>`).join('')}</div>
-        <div class="seg" role="group" aria-label="Activity">${[['all', 'Everyone'], ['active', 'Active'], ['quiet', 'Gone quiet']].map(([v, t]) => `<button data-sstatus="${v}" aria-pressed="${s.status === v}">${t}</button>`).join('')}</div>
+        <div class="seg" role="group" aria-label="Activity">${[['all', 'Everyone'], ['active', 'Active'], ['quiet', 'Gone quiet'], ['ended', 'Finished']].map(([v, t]) => `<button data-sstatus="${v}" aria-pressed="${s.status === v}">${t}</button>`).join('')}</div>
       </div>
       <div id="student-list">${skeleton(5)}</div>`;
     let rows = await API.people(state.chapter, { type: 'student', q: s.q });
     if (!live()) return;
 
     const draw = () => {
-      const filtered = rows.filter((r) => (s.gender === 'all' || r.gender === s.gender) && (s.status === 'all' || (s.status === 'active' ? r.active : !r.active)));
+      const filtered = rows.filter((r) => (s.gender === 'all' || r.gender === s.gender) && (s.status === 'all' || (s.status === 'active' ? r.active : s.status === 'ended' ? Boolean(r.studyEnd) : !r.active && !r.studyEnd)));
       $('#count-line').textContent = `${plural(rows.filter((r) => r.active).length, 'active student')} in ${state.chapterInfo.name}`;
       $('#student-list').innerHTML = filtered.length ? `<div class="list">${filtered.map((r) => {
         const sub = r.nextStudy ? `Next: ${r.nextStudy.title}, ${T.relativeDay(r.nextStudy.startsAt, tz())} ${T.formatTime(r.nextStudy.startsAt, tz())}`
@@ -407,7 +409,7 @@
         return `<a class="row" href="#student-${encodeURIComponent(r.personId)}">
           <span class="avatar ${r.gender || ''}">${esc(initials(r.displayName))}</span>
           <span class="row-main"><span class="row-title">${esc(r.displayName)}</span><span class="row-sub">${esc(sub)}</span></span>
-          <span class="row-end">${miniPath(r.progress)}${r.active ? '' : '<span class="chip warn">Gone quiet</span>'}</span>
+          <span class="row-end">${miniPath(r.progress)}${studyStatusChip(r)}</span>
         </a>`;
       }).join('')}</div>` : `<div class="list"><div class="empty"><strong>${s.q ? `No students match "${esc(s.q)}"` : 'No students here'}</strong><span>${s.q ? 'Check the spelling, or add them as a new student when you schedule their first study.' : 'Try a different filter.'}</span>${s.q ? `<a class="btn sm" href="#schedule">Schedule a first study</a>` : ''}</div></div>`;
     };
@@ -446,11 +448,12 @@
           <h1>${esc(p.displayName)}</h1>
           <div class="person-meta">
             <span class="chip">${esc(genderLabel(p.gender))}</span>
-            ${p.active ? '<span class="chip ok"><span class="dot"></span>Active</span>' : '<span class="chip warn">Gone quiet</span>'}
+            ${studyStatusChip(p, true)}
             ${p.talk ? `<span class="chip">${esc(p.talk.name)}</span>` : ''}
           </div>
         </div>
       </div>
+      <div class="study-end" id="study-end">${studyEndHTML(p)}</div>
       <dl class="facts">
         <div class="fact"><dt>Phone</dt><dd>${p.phone ? `<span class="num">${esc(prettyPhone(p.phone))}</span><button class="copy-btn" data-copy="${esc(prettyPhone(p.phone))}">Copy</button>` : '<span class="muted">Not recorded</span>'}</dd></div>
         <div class="fact"><dt>First study set up by</dt><dd>${p.firstSetUpBy ? `<a href="#disciple-${encodeURIComponent(p.firstSetUpBy.personId)}">${esc(p.firstSetUpBy.name)}</a>` : '<span class="muted">Not recorded</span>'}</dd></div>
@@ -468,6 +471,34 @@
         </div>
       </section>`;
     drawJourney(true);
+    $('#study-end').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('[data-studyend]');
+      if (!b || b.disabled) return;
+      const reason = b.getAttribute('aria-pressed') === 'true' ? null : b.dataset.studyend;
+      $$('#study-end button').forEach((x) => { x.disabled = true; });
+      try {
+        const r = await API.setStudyEnd(state.chapter, p.personId, reason);
+        p.studyEnd = r.studyEnd; p.active = false;
+        toast(!reason ? `${p.firstName} is back on the student list.` : reason === 'baptized' ? `Praise God! ${p.firstName} got baptized.` : `Marked: ${p.firstName} is no longer studying.`);
+        const fresh = await API.person(state.chapter, p.personId);
+        Object.assign(p, fresh);
+        $('#study-end').innerHTML = studyEndHTML(p);
+        const meta = $('.person-meta'); if (meta) meta.innerHTML = `<span class="chip">${esc(genderLabel(p.gender))}</span>${studyStatusChip(p, true)}${p.talk ? `<span class="chip">${esc(p.talk.name)}</span>` : ''}`;
+      } catch (e) { toast(e.message || "Couldn't save that."); $$('#study-end button').forEach((x) => { x.disabled = false; }); }
+    });
+  }
+
+  function studyStatusChip(p, withActive) {
+    if (p.studyEnd && p.studyEnd.reason === 'baptized') return `<span class="chip baptized">${icon('drop')}Baptized</span>`;
+    if (p.studyEnd) return '<span class="chip">No longer studying</span>';
+    if (p.active) return withActive ? '<span class="chip ok"><span class="dot"></span>Active</span>' : '';
+    return '<span class="chip warn">Gone quiet</span>';
+  }
+  function studyEndHTML(p) {
+    const r = p.studyEnd ? p.studyEnd.reason : null;
+    const when = p.studyEnd && p.studyEnd.at ? ` · ${esc(T.formatDate(p.studyEnd.at, tz(), 'medium'))}` : '';
+    return `<button class="end-btn" data-studyend="stopped" aria-pressed="${r === 'stopped'}">${icon('pause')}No longer studying${r === 'stopped' ? when : ''}</button>
+      <button class="end-btn baptized" data-studyend="baptized" aria-pressed="${r === 'baptized'}">${icon('drop')}Got Baptized!${r === 'baptized' ? when : ''}</button>`;
   }
 
   function aboutHTML(p, updating) {

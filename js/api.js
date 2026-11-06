@@ -77,7 +77,7 @@
       const past = evs.filter((e) => e.startsAt <= nowIso).sort((a, b) => b.startsAt.localeCompare(a.startsAt));
       const future = evs.filter((e) => e.startsAt > nowIso).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
       const cutoff = new Date(Date.now() - ACTIVE_WINDOW_DAYS * 86400000).toISOString();
-      const active = future.length > 0 || (past[0] && past[0].startsAt >= cutoff) || (p.createdAt && p.createdAt >= cutoff);
+      const active = !p.studyEnd && (future.length > 0 || (past[0] && past[0].startsAt >= cutoff) || (p.createdAt && p.createdAt >= cutoff));
       const latest = past[0] || future[0] || null;
       return { active: !!active, lastStudy: past[0] ? eventDTO(past[0]) : null, nextStudy: future[0] ? eventDTO(future[0]) : null, talkId: latest ? latest.talkId : null };
     }
@@ -100,7 +100,7 @@
       if (p.type === 'student') {
         const a = activity(p);
         const t = talk(a.talkId);
-        return { ...base, active: a.active, lastStudy: a.lastStudy, nextStudy: a.nextStudy, talk: t ? { id: t.id, name: t.name } : null, progress: progress(p.personId) };
+        return { ...base, active: a.active && !p.studyEnd, studyEnd: p.studyEnd || null, lastStudy: a.lastStudy, nextStudy: a.nextStudy, talk: t ? { id: t.id, name: t.name } : null, progress: progress(p.personId) };
       }
       const t = talk(p.talkId);
       return { ...base, role: p.role, talk: t ? { id: t.id, name: t.name } : null, birthday: p.birthday, spirthday: p.spirthday };
@@ -306,6 +306,13 @@
         f.notes.push({ id: `n${Date.now()}`, body: body.trim(), createdAt: now(), author: ref(db.viewer.personId) });
         return wait({ ok: true }, 250);
       },
+      async setStudyEnd(ch, id, reason) {
+        requireSession(); requireChapter(ch);
+        const p = person(id);
+        if (!p || p.type !== 'student') throw new ApiError('not_found', 'Choose a student in this chapter.', 404);
+        p.studyEnd = reason ? { reason, at: now() } : null;
+        return wait({ studyEnd: p.studyEnd }, 250);
+      },
       async addEncouragement(ch, id, item) {
         const it = String(item || '').trim().replace(/\s+/g, ' ');
         if (!it || it.length > 80) throw new ApiError('bad_item', 'Keep it short: up to 80 characters.', 400);
@@ -402,6 +409,7 @@
       saveReport: (ch, id, r) => call(`/m/${ch}/studies/${encodeURIComponent(id)}/report`, { method: 'POST', body: r }),
       fallAways: (ch) => call(`/m/${ch}/fall-aways`),
       addFallAwayNote: (ch, id, body) => call(`/m/${ch}/fall-aways/${encodeURIComponent(id)}/notes`, { method: 'POST', body: { body } }),
+      setStudyEnd: (ch, id, reason) => call(`/m/${ch}/people/${encodeURIComponent(id)}/study-status`, { method: 'POST', body: { reason } }),
       addEncouragement: (ch, id, item) => call(`/m/${ch}/people/${encodeURIComponent(id)}/encouragements`, { method: 'POST', body: { item } }),
       removeEncouragement: (ch, id, item) => call(`/m/${ch}/people/${encodeURIComponent(id)}/encouragements${q({ item })}`, { method: 'DELETE' }),
     };
