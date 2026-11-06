@@ -82,7 +82,7 @@
     pendingOpen: null,
     journey: null,
     cal: { week: null, men: true, women: true, hiddenTalks: new Set() },
-    students: { q: '', gender: 'all', status: 'all', talk: 'all' },
+    students: { q: '', gender: 'all', status: 'all', talk: 'all', mine: false },
     hot: { gender: 'all', talk: 'all' },
     disciples: { q: '' },
     signin: { step: 'phone', phone: '', error: '', busy: false },
@@ -396,6 +396,7 @@
         <div class="seg" role="group" aria-label="Men or women">${[['all', 'All'], ['men', 'Men'], ['women', 'Women']].map(([v, t]) => `<button data-sgender="${v}" aria-pressed="${s.gender === v}">${t}</button>`).join('')}</div>
         <div class="seg" role="group" aria-label="Activity">${[['all', 'Everyone'], ['active', 'Active'], ['quiet', 'Gone quiet'], ['ended', 'Finished']].map(([v, t]) => `<button data-sstatus="${v}" aria-pressed="${s.status === v}">${t}</button>`).join('')}</div>
         <div id="student-talks"></div>
+        <button class="toggle mine-toggle" data-smine aria-pressed="${s.mine}"><span class="swatch"></span>Only my students</button>
       </div>
       <div id="student-list">${skeleton(5)}</div>`;
     let rows = await API.people(state.chapter, { type: 'student', q: s.q });
@@ -411,7 +412,7 @@
     };
     const draw = () => {
       drawTalks();
-      const filtered = rows.filter((r) => (s.talk === 'all' || (s.talk === 'none' ? !r.talk : r.talk && r.talk.id === s.talk)) && (s.gender === 'all' || r.gender === s.gender) && (s.status === 'all' || (s.status === 'active' ? r.active : s.status === 'ended' ? Boolean(r.studyEnd) : !r.active && !r.studyEnd)));
+      const filtered = rows.filter((r) => (!s.mine || r.mine) && (s.talk === 'all' || (s.talk === 'none' ? !r.talk : r.talk && r.talk.id === s.talk)) && (s.gender === 'all' || r.gender === s.gender) && (s.status === 'all' || (s.status === 'active' ? r.active : s.status === 'ended' ? Boolean(r.studyEnd) : !r.active && !r.studyEnd)));
       $('#count-line').textContent = `${plural(rows.filter((r) => r.active).length, 'active student')} in ${state.chapterInfo.name}`;
       $('#student-list').innerHTML = filtered.length ? `<div class="list">${filtered.map((r) => {
         const sub = r.nextStudy ? `Next: ${r.nextStudy.title}, ${T.relativeDay(r.nextStudy.startsAt, tz())} ${T.formatTime(r.nextStudy.startsAt, tz())}`
@@ -421,7 +422,7 @@
           <span class="row-main"><span class="row-title">${esc(r.displayName)}</span><span class="row-sub">${esc(sub)}</span></span>
           <span class="row-end">${miniPath(r.progress)}${!r.active && !r.studyEnd ? studyStatusChip(r) : ''}${rowEndButtons(r)}</span>
         </a>`;
-      }).join('')}</div>` : `<div class="list"><div class="empty"><strong>${s.q ? `No students match "${esc(s.q)}"` : 'No students here'}</strong><span>${s.q ? 'Check the spelling, or add them as a new student when you schedule their first study.' : 'Try a different filter.'}</span>${s.q ? `<a class="btn sm" href="#schedule">Schedule a first study</a>` : ''}</div></div>`;
+      }).join('')}</div>` : `<div class="list"><div class="empty"><strong>${s.q ? `No students match "${esc(s.q)}"` : s.mine ? "You haven't set up or led a study with anyone here" : 'No students here'}</strong><span>${s.q ? 'Check the spelling, or add them as a new student when you schedule their first study.' : 'Try a different filter.'}</span>${s.q ? `<a class="btn sm" href="#schedule">Schedule a first study</a>` : ''}</div></div>`;
     };
     draw();
 
@@ -438,6 +439,8 @@
       const g = ev.target.closest('[data-sgender]'); const st = ev.target.closest('[data-sstatus]');
       if (g) { s.gender = g.dataset.sgender; $$('[data-sgender]').forEach((b) => b.setAttribute('aria-pressed', b === g)); draw(); }
       if (st) { s.status = st.dataset.sstatus; $$('[data-sstatus]').forEach((b) => b.setAttribute('aria-pressed', b === st)); draw(); }
+      const mn = ev.target.closest('[data-smine]');
+      if (mn) { s.mine = !s.mine; mn.setAttribute('aria-pressed', s.mine); draw(); }
       const tk = ev.target.closest('[data-stalk]');
       if (tk) { s.talk = tk.dataset.stalk; draw(); }
       const eb = ev.target.closest('[data-rowend]');

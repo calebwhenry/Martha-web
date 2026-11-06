@@ -207,7 +207,11 @@
       async people(ch, { type, q = '' } = {}) {
         requireSession(); requireChapter(ch);
         const rows = db.people.filter((p) => p.chapter === ch && p.type === type && matches(p, q.trim()))
-          .sort((a, b) => a.displayName.localeCompare(b.displayName)).map(personSummary);
+          .sort((a, b) => a.displayName.localeCompare(b.displayName)).map((p) => {
+            const r = personSummary(p);
+            if (type === 'student') r.mine = studentEvents(p.personId).some((e) => e.leaderId === db.viewer.personId || e.organizerId === db.viewer.personId);
+            return r;
+          });
         return wait(rows, 90);
       },
 
