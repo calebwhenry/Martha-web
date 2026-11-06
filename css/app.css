@@ -872,3 +872,16 @@ input[type="date"].input, input[type="time"].input { line-height: 24px; }
 .chip.baptized svg { width: 13px; height: 13px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .chip.baptized { color: oklch(0.8 0.1 225); } }
 :root[data-theme="dark"] .chip.baptized { color: oklch(0.8 0.1 225); }
+
+/* Quick study-end buttons on each Students row */
+.row-btns { display: flex; gap: 6px; }
+.row-end-btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 999px; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-2); background: var(--fill, rgba(120,120,128,0.12)); cursor: pointer; transition: background 200ms var(--ease), color 200ms var(--ease), transform 120ms var(--ease); }
+.row-end-btn svg { width: 15px; height: 15px; color: var(--muted); }
+.row-end-btn.baptized svg { color: oklch(0.62 0.13 230); }
+.row-end-btn[aria-pressed="true"] { background: var(--ink-2); color: var(--surface); }
+.row-end-btn[aria-pressed="true"] svg { color: var(--surface); }
+.row-end-btn.baptized[aria-pressed="true"] { background: linear-gradient(135deg, oklch(0.62 0.13 235), oklch(0.7 0.12 200)); color: #fff; }
+.row-end-btn.baptized[aria-pressed="true"] svg { color: #fff; }
+.row-end-btn:active { transform: scale(0.94); }
+.row-end-btn:disabled { opacity: 0.55; cursor: progress; }
+@media (max-width: 560px) { .row-end-btn { width: 34px; height: 34px; padding: 0; justify-content: center; } .row-end-btn span { display: none; } .row-btns .row-end-btn svg { width: 17px; height: 17px; } }

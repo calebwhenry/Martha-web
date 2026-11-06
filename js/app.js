@@ -82,7 +82,7 @@
     pendingOpen: null,
     journey: null,
     cal: { week: null, men: true, women: true, hiddenTalks: new Set() },
-    students: { q: '', gender: 'all', status: 'all' },
+    students: { q: '', gender: 'all', status: 'all', talk: 'all' },
     hot: { gender: 'all', talk: 'all' },
     disciples: { q: '' },
     signin: { step: 'phone', phone: '', error: '', busy: false },
@@ -323,7 +323,7 @@
     const talks = o.talks || [];
     const rows = all.filter((r) => (H.gender === 'all' || r.gender === H.gender)
       && (H.talk === 'all' || (H.talk === 'none' ? !r.talk : r.talk && r.talk.id === H.talk)));
-    const talkBtns = talks.length ? `<div class="seg" role="group" aria-label="Bible Talk">${[['all', 'All Talks'], ...talks.map((t) => [t.id, t.name]), ['none', 'No Talk']]
+    const talkBtns = talks.length ? `<div class="seg" role="group" aria-label="Bible Talk">${[['all', 'All BTs'], ...talks.map((t) => [t.id, t.name]), ['none', 'No BT']]
       .map(([v, t]) => `<button data-hottalk="${esc(v)}" aria-pressed="${H.talk === v}">${esc(t)}</button>`).join('')}</div>` : '';
     return `<div class="section">
       <div class="section-head"><h2 id="h-hot">Hot studies</h2><span class="small muted">${plural(rows.length, 'student')}</span></div>
@@ -395,13 +395,23 @@
       <div class="toggle-row">
         <div class="seg" role="group" aria-label="Men or women">${[['all', 'All'], ['men', 'Men'], ['women', 'Women']].map(([v, t]) => `<button data-sgender="${v}" aria-pressed="${s.gender === v}">${t}</button>`).join('')}</div>
         <div class="seg" role="group" aria-label="Activity">${[['all', 'Everyone'], ['active', 'Active'], ['quiet', 'Gone quiet'], ['ended', 'Finished']].map(([v, t]) => `<button data-sstatus="${v}" aria-pressed="${s.status === v}">${t}</button>`).join('')}</div>
+        <div id="student-talks"></div>
       </div>
       <div id="student-list">${skeleton(5)}</div>`;
     let rows = await API.people(state.chapter, { type: 'student', q: s.q });
     if (!live()) return;
 
+    const drawTalks = () => {
+      const box = $('#student-talks'); if (!box) return;
+      const seen = new Map(); rows.forEach((r) => { if (r.talk) seen.set(r.talk.id, r.talk.name); });
+      if (!state.chapterInfo.bibleTalksEnabled || !seen.size) { box.innerHTML = ''; s.talk = 'all'; return; }
+      if (s.talk !== 'all' && s.talk !== 'none' && !seen.has(s.talk)) s.talk = 'all';
+      const opts = [['all', 'All BTs'], ...[...seen.entries()].sort((a, b) => a[1].localeCompare(b[1])), ['none', 'No BT']];
+      box.innerHTML = `<div class="seg" role="group" aria-label="Bible Talk">${opts.map(([v, t]) => `<button data-stalk="${esc(v)}" aria-pressed="${s.talk === v}">${esc(t)}</button>`).join('')}</div>`;
+    };
     const draw = () => {
-      const filtered = rows.filter((r) => (s.gender === 'all' || r.gender === s.gender) && (s.status === 'all' || (s.status === 'active' ? r.active : s.status === 'ended' ? Boolean(r.studyEnd) : !r.active && !r.studyEnd)));
+      drawTalks();
+      const filtered = rows.filter((r) => (s.talk === 'all' || (s.talk === 'none' ? !r.talk : r.talk && r.talk.id === s.talk)) && (s.gender === 'all' || r.gender === s.gender) && (s.status === 'all' || (s.status === 'active' ? r.active : s.status === 'ended' ? Boolean(r.studyEnd) : !r.active && !r.studyEnd)));
       $('#count-line').textContent = `${plural(rows.filter((r) => r.active).length, 'active student')} in ${state.chapterInfo.name}`;
       $('#student-list').innerHTML = filtered.length ? `<div class="list">${filtered.map((r) => {
         const sub = r.nextStudy ? `Next: ${r.nextStudy.title}, ${T.relativeDay(r.nextStudy.startsAt, tz())} ${T.formatTime(r.nextStudy.startsAt, tz())}`
@@ -409,7 +419,7 @@
         return `<a class="row" href="#student-${encodeURIComponent(r.personId)}">
           <span class="avatar ${r.gender || ''}">${esc(initials(r.displayName))}</span>
           <span class="row-main"><span class="row-title">${esc(r.displayName)}</span><span class="row-sub">${esc(sub)}</span></span>
-          <span class="row-end">${miniPath(r.progress)}${studyStatusChip(r)}</span>
+          <span class="row-end">${miniPath(r.progress)}${!r.active && !r.studyEnd ? studyStatusChip(r) : ''}${rowEndButtons(r)}</span>
         </a>`;
       }).join('')}</div>` : `<div class="list"><div class="empty"><strong>${s.q ? `No students match "${esc(s.q)}"` : 'No students here'}</strong><span>${s.q ? 'Check the spelling, or add them as a new student when you schedule their first study.' : 'Try a different filter.'}</span>${s.q ? `<a class="btn sm" href="#schedule">Schedule a first study</a>` : ''}</div></div>`;
     };
@@ -428,6 +438,22 @@
       const g = ev.target.closest('[data-sgender]'); const st = ev.target.closest('[data-sstatus]');
       if (g) { s.gender = g.dataset.sgender; $$('[data-sgender]').forEach((b) => b.setAttribute('aria-pressed', b === g)); draw(); }
       if (st) { s.status = st.dataset.sstatus; $$('[data-sstatus]').forEach((b) => b.setAttribute('aria-pressed', b === st)); draw(); }
+      const tk = ev.target.closest('[data-stalk]');
+      if (tk) { s.talk = tk.dataset.stalk; draw(); }
+      const eb = ev.target.closest('[data-rowend]');
+      if (eb) {
+        ev.preventDefault(); ev.stopPropagation();
+        if (eb.disabled) return;
+        const r = rows.find((x) => x.personId === eb.dataset.person); if (!r) return;
+        const reason = eb.getAttribute('aria-pressed') === 'true' ? null : eb.dataset.rowend;
+        eb.closest('.row-btns').querySelectorAll('button').forEach((x) => { x.disabled = true; });
+        API.setStudyEnd(state.chapter, r.personId, reason).then(async (res) => {
+          r.studyEnd = res.studyEnd;
+          toast(!reason ? `${r.firstName} is back on the student list.` : reason === 'baptized' ? `Praise God! ${r.firstName} got baptized.` : `Marked: ${r.firstName} is no longer studying.`);
+          try { rows = await API.people(state.chapter, { type: 'student', q: s.q }); } catch { /* keep local change */ }
+          if (live()) draw();
+        }).catch((e) => { toast(e.message || "Couldn't save that."); if (live()) draw(); });
+      }
     });
   }
 
@@ -493,6 +519,11 @@
     if (p.studyEnd) return '<span class="chip">No longer studying</span>';
     if (p.active) return withActive ? '<span class="chip ok"><span class="dot"></span>Active</span>' : '';
     return '<span class="chip warn">Gone quiet</span>';
+  }
+  function rowEndButtons(r) {
+    const why = r.studyEnd ? r.studyEnd.reason : null;
+    const b = (k, ic, label, short) => `<button type="button" class="row-end-btn${k === 'baptized' ? ' baptized' : ''}" data-rowend="${k}" data-person="${esc(r.personId)}" aria-pressed="${why === k}" title="${label}" aria-label="${label}: ${esc(r.displayName)}">${icon(ic)}<span>${short}</span></button>`;
+    return `<span class="row-btns">${b('stopped', 'pause', 'No longer studying', 'Stopped')}${b('baptized', 'drop', 'Got Baptized!', 'Baptized')}</span>`;
   }
   function studyEndHTML(p) {
     const r = p.studyEnd ? p.studyEnd.reason : null;
