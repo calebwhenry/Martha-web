@@ -95,6 +95,7 @@
     for (const [prefix, name] of [['student-', 'student'], ['disciple-', 'disciple'], ['schedule-', 'schedule']]) {
       if (h.startsWith(prefix)) return { name, id: h.slice(prefix.length) };
     }
+    if (h.startsWith('students?')) return { name: 'students', filters: Object.fromEntries(new URLSearchParams(h.slice(9))) };
     if (['students', 'disciples', 'calendar', 'schedule', 'fall-aways'].includes(h)) return { name: h };
     return { name: 'home' };
   }
@@ -227,15 +228,18 @@
     const arc = (cls, start, share, both) => {
       if (share <= 0) return '';
       const len = both ? Math.max(0.01, RC * share - 21) : RC;
-      return `<circle class="arc ${cls}" cx="84" cy="84" r="70" stroke-dasharray="${len.toFixed(2)} ${RC.toFixed(2)}" stroke-dashoffset="${(-(RC * start + (both ? 10.5 : 0))).toFixed(2)}"/>`;
+      const dash = `stroke-dasharray="${len.toFixed(2)} ${RC.toFixed(2)}" stroke-dashoffset="${(-(RC * start + (both ? 10.5 : 0))).toFixed(2)}"`;
+      const n = cls === 'men' ? a.men : a.women;
+      return `<a class="arc-link ${cls}" href="${studentsLink({ gender: cls, status: 'active' })}" aria-label="${n} ${cls === 'men' ? 'men' : 'women'} studying: show their Bible studies">
+        <circle class="arc-hit" cx="84" cy="84" r="70" ${dash}/><circle class="arc ${cls}" cx="84" cy="84" r="70" ${dash}/></a>`;
     };
     const mShare = a.total ? a.men / a.total : 0, wShare = a.total ? a.women / a.total : 0, both = a.men > 0 && a.women > 0;
     const pctText = (n) => (a.total ? `${Math.round((n / a.total) * 100)}%` : '');
     const hero = `<section class="panel stat-hero w5" aria-labelledby="h-active">
       <h2 id="h-active">Active Bible studies</h2>
       <div class="hero-body">
-        <div class="ring" role="img" aria-label="${a.total} ${a.total === 1 ? 'student' : 'students'} studying: ${a.men} men, ${a.women} women">
-          <svg viewBox="0 0 168 168" aria-hidden="true">
+        <div class="ring">
+          <svg viewBox="0 0 168 168" role="group" aria-label="${a.total} ${a.total === 1 ? 'student' : 'students'} studying: ${a.men} men, ${a.women} women">
             <defs>
               <linearGradient id="ring-men" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:color-mix(in oklab, var(--men) 55%, white)"/><stop offset="1" style="stop-color:var(--men)"/></linearGradient>
               <linearGradient id="ring-women" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:color-mix(in oklab, var(--women) 55%, white)"/><stop offset="1" style="stop-color:var(--women)"/></linearGradient>
@@ -243,11 +247,15 @@
             <circle class="track" cx="84" cy="84" r="70"/>
             ${arc('men', 0, mShare, both)}${arc('women', mShare, wShare, both)}
           </svg>
-          <div class="ring-center"><span class="big num">${a.total}</span><span class="big-label">${a.total === 1 ? 'student' : 'students'} studying</span></div>
+          <div class="ring-center" aria-hidden="true">
+            <div class="rc rc-all"><span class="big num">${a.total}</span><span class="big-label">${a.total === 1 ? 'student' : 'students'} studying</span></div>
+            <div class="rc rc-men"><span class="big num">${a.men}</span><span class="big-label">${a.men === 1 ? 'man' : 'men'} studying</span></div>
+            <div class="rc rc-women"><span class="big num">${a.women}</span><span class="big-label">${a.women === 1 ? 'woman' : 'women'} studying</span></div>
+          </div>
         </div>
         <div class="split-legend">
-          <div><b class="num">${a.men}</b><span><i style="background:var(--men)"></i>Men</span><em>${pctText(a.men)}</em></div>
-          <div><b class="num">${a.women}</b><span><i style="background:var(--women)"></i>Women</span><em>${pctText(a.women)}</em></div>
+          <a class="legend-link men" href="${studentsLink({ gender: 'men', status: 'active' })}"><b class="num">${a.men}</b><span><i style="background:var(--men)"></i>Men${icon('right')}</span><em>${pctText(a.men)}</em></a>
+          <a class="legend-link women" href="${studentsLink({ gender: 'women', status: 'active' })}"><b class="num">${a.women}</b><span><i style="background:var(--women)"></i>Women${icon('right')}</span><em>${pctText(a.women)}</em></a>
         </div>
       </div>
       <p class="def">Students with a study in the last 14 days or one on the calendar.</p>
@@ -257,14 +265,14 @@
       <div class="section">
         <div class="section-head"><h2 id="h-talks">By Bible Talk</h2></div>
         <div class="talk-rows">
-          ${o.talks.map((t) => `<div class="talk-row" style="--tone:${toneVar(t.tone)}">
+          ${o.talks.map((t) => `<a class="talk-row" href="${studentsLink({ talk: t.id, status: 'active' })}" style="--tone:${toneVar(t.tone)}" aria-label="${esc(t.name)}: ${t.activeStudents} active. Show their Bible studies">
             <div class="talk-row-top">
-              <span class="talk-name"><i></i>${esc(t.name)}</span>
+              <span class="talk-name"><i></i>${esc(t.name)}${icon('right')}</span>
               <span><b class="num">${t.activeStudents}</b> <span class="muted small">active</span></span>
             </div>
             <div class="bar"><span style="width:${(t.activeStudents / maxTalk) * 100}%"></span></div>
             <p class="small muted">${t.men} men · ${t.women} women · Led by ${t.leader ? esc(t.leader.name) : 'Not assigned'}${t.coLeader ? ' and ' + esc(t.coLeader.name) : ''}</p>
-          </div>`).join('')}
+          </a>`).join('')}
         </div>
         <p class="def">Counted by the Bible Talk of whoever set up each student's latest study.</p>
       </div>
@@ -273,14 +281,14 @@
     const upcoming = `<section class="panel ${o.talks ? 'w7' : 'w7'}" style="padding:0" aria-labelledby="h-week">
       <div style="padding:20px 20px 8px" class="section">
         <div class="section-head"><h2 id="h-week">This week</h2><a href="#calendar">Open calendar</a></div>
-        <div class="week-count"><b class="num">${o.weekCount}</b><span class="muted">${o.weekCount === 1 ? 'study' : 'studies'} this week, ${o.weekDone} done so far</span></div>
+        <a class="week-count" href="#calendar"><b class="num">${o.weekCount}</b><span class="muted">${o.weekCount === 1 ? 'study' : 'studies'} this week, ${o.weekDone} done so far</span></a>
       </div>
       ${o.upcoming.length ? `<div>${o.upcoming.map((e) => evRow(e)).join('')}</div>` : `<div class="empty"><strong>Nothing coming up</strong><span>Schedule a study and it will show here.</span><a class="btn sm" href="#schedule">Schedule a study</a></div>`}
     </section>`;
 
     const quiet = `<section class="panel w5" aria-labelledby="h-quiet">
       <div class="section">
-        <div class="section-head"><h2 id="h-quiet">Gone quiet</h2></div>
+        <div class="section-head"><h2 id="h-quiet">Gone quiet</h2>${o.quiet.length ? `<a href="${studentsLink({ status: 'quiet' })}">See all</a>` : ''}</div>
         <p class="small muted">No study in 14+ days and nothing scheduled.</p>
         ${o.quiet.length ? `<div class="list" style="border:0;border-radius:0;background:none">${o.quiet.map((q) => `
           <div class="row" style="padding-inline:0">
@@ -388,8 +396,20 @@
     return { done: core.filter((p) => p.state === 'done').length, total: core.length };
   }
 
+  // A link into the Students tab with filters already set (from the dashboard, a chip, etc.).
+  const studentsLink = (f) => '#students?' + new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
+
   async function viewStudents(view, route, live) {
     const s = state.students;
+    if (route.filters) {
+      const f = route.filters;
+      Object.assign(s, {
+        q: '', mine: false,
+        gender: ['men', 'women'].includes(f.gender) ? f.gender : 'all',
+        status: ['active', 'quiet', 'ended'].includes(f.status) ? f.status : 'all',
+        talk: f.talk || 'all',
+      });
+    }
     view.innerHTML = `
       <div class="page-head"><div><h1>Students</h1><p class="sub" id="count-line">People studying the Bible in ${esc(state.chapterInfo.name)}</p></div>
         <a class="btn ghost" href="#schedule">${icon('plus')}New student</a></div>
@@ -478,9 +498,9 @@
         <div style="min-width:0">
           <h1>${esc(p.displayName)}</h1>
           <div class="person-meta">
-            <span class="chip">${esc(genderLabel(p.gender))}</span>
+            ${p.type === 'student' && ['men', 'women'].includes(p.gender) ? `<a class="chip chip-link" href="${studentsLink({ gender: p.gender })}">${esc(genderLabel(p.gender))}</a>` : `<span class="chip">${esc(genderLabel(p.gender))}</span>`}
             ${studyStatusChip(p, true)}
-            ${p.talk ? `<span class="chip">${esc(p.talk.name)}</span>` : ''}
+            ${p.talk ? (p.type === 'student' ? `<a class="chip chip-link" href="${studentsLink({ talk: p.talk.id })}">${esc(p.talk.name)}</a>` : `<span class="chip">${esc(p.talk.name)}</span>`) : ''}
           </div>
         </div>
       </div>
@@ -514,7 +534,7 @@
         const fresh = await API.person(state.chapter, p.personId);
         Object.assign(p, fresh);
         $('#study-end').innerHTML = studyEndHTML(p);
-        const meta = $('.person-meta'); if (meta) meta.innerHTML = `<span class="chip">${esc(genderLabel(p.gender))}</span>${studyStatusChip(p, true)}${p.talk ? `<span class="chip">${esc(p.talk.name)}</span>` : ''}`;
+        const meta = $('.person-meta'); if (meta) meta.innerHTML = `${p.type === 'student' && ['men', 'women'].includes(p.gender) ? `<a class="chip chip-link" href="${studentsLink({ gender: p.gender })}">${esc(genderLabel(p.gender))}</a>` : `<span class="chip">${esc(genderLabel(p.gender))}</span>`}${studyStatusChip(p, true)}${p.talk ? (p.type === 'student' ? `<a class="chip chip-link" href="${studentsLink({ talk: p.talk.id })}">${esc(p.talk.name)}</a>` : `<span class="chip">${esc(p.talk.name)}</span>`) : ''}`;
       } catch (e) { toast(e.message || "Couldn't save that."); $$('#study-end button').forEach((x) => { x.disabled = false; }); }
     });
   }
@@ -805,7 +825,7 @@
         <div style="min-width:0"><h1>${esc(p.displayName)}</h1>
           <div class="person-meta">
             ${p.aliases && p.aliases.length ? `<span class="chip">Goes by ${esc(p.aliases.join(', '))}</span>` : ''}
-            <span class="chip">${esc(genderLabel(p.gender))}</span>
+            ${p.type === 'student' && ['men', 'women'].includes(p.gender) ? `<a class="chip chip-link" href="${studentsLink({ gender: p.gender })}">${esc(genderLabel(p.gender))}</a>` : `<span class="chip">${esc(genderLabel(p.gender))}</span>`}
             ${roleLabel(p.role) ? `<span class="chip accent">${esc(roleLabel(p.role))}</span>` : ''}
           </div>
         </div>

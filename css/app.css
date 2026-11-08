@@ -913,3 +913,63 @@ a.row .avatar { transition: transform 420ms var(--spring); }
 @media (max-width: 560px) { .row-end-btn { width: 34px; height: 34px; padding: 0; justify-content: center; } .row-end-btn span { display: none; } .row-btns .row-end-btn svg { width: 16px; height: 16px; } }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mini-path i:not(.imported) { filter: brightness(1.6) saturate(1.1); } }
 :root[data-theme="dark"] .mini-path i:not(.imported) { filter: brightness(1.6) saturate(1.1); }
+
+/* ---------- Dashboard: everything that looks clickable is ---------- */
+/* Ring: each half is a link. Hovering (or focusing) a half swells it and dims the other,
+   and the centre reads out that group. The legend rows drive the same highlight. */
+.ring .arc-link { cursor: pointer; outline: none; }
+.ring .arc-hit { fill: none; stroke: transparent; stroke-width: 30; pointer-events: stroke; }
+.ring .arc { pointer-events: none; transition: stroke-width 420ms var(--spring), opacity 300ms var(--ease), filter 300ms var(--ease); }
+.stat-hero:has(.arc-link.men:hover, .arc-link.men:focus-visible, .legend-link.men:hover, .legend-link.men:focus-visible) .arc.men,
+.stat-hero:has(.arc-link.women:hover, .arc-link.women:focus-visible, .legend-link.women:hover, .legend-link.women:focus-visible) .arc.women {
+  stroke-width: 15; filter: drop-shadow(0 4px 10px color-mix(in oklab, currentColor 30%, transparent));
+}
+.stat-hero:has(.arc-link.men:hover, .arc-link.men:focus-visible, .legend-link.men:hover, .legend-link.men:focus-visible) .arc.women,
+.stat-hero:has(.arc-link.women:hover, .arc-link.women:focus-visible, .legend-link.women:hover, .legend-link.women:focus-visible) .arc.men { opacity: 0.3; }
+.ring .arc-link:active .arc { stroke-width: 12; transition-duration: 90ms; }
+.ring-center { pointer-events: none; place-content: stretch; place-items: center; }
+.ring-center .rc { grid-area: 1 / 1; display: grid; justify-items: center; gap: 2px; text-align: center; transition: opacity 260ms var(--ease), transform 420ms var(--ease-out), filter 260ms var(--ease); }
+.ring-center .rc-men, .ring-center .rc-women { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+.stat-hero:has(.arc-link.men:hover, .arc-link.men:focus-visible, .legend-link.men:hover, .legend-link.men:focus-visible) .rc-men,
+.stat-hero:has(.arc-link.women:hover, .arc-link.women:focus-visible, .legend-link.women:hover, .legend-link.women:focus-visible) .rc-women { opacity: 1; transform: none; filter: none; }
+.stat-hero:has(.arc-link:hover, .arc-link:focus-visible, .legend-link:hover, .legend-link:focus-visible) .rc-all { opacity: 0; transform: translateY(-8px); filter: blur(4px); }
+.rc-men .big { color: var(--men); }
+.rc-women .big { color: var(--women); }
+
+.split-legend > a {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 14px;
+  margin: -8px -12px; padding: 8px 12px; border-radius: 16px; text-decoration: none; color: inherit;
+  transition: background-color 220ms var(--ease), transform 200ms var(--ease);
+}
+.split-legend > a svg, .talk-name svg { width: 15px; height: 15px; stroke-width: 2.2; color: var(--muted); opacity: 0; transform: translateX(-4px); transition: opacity 220ms var(--ease), transform 320ms var(--ease-out); }
+.split-legend > a:focus-visible, a.talk-row:focus-visible { outline-offset: 2px; }
+.split-legend > a:active, a.talk-row:active { transform: scale(0.985); transition-duration: 90ms; }
+
+/* Bible Talk rows: the whole row opens that Bible Talk's students. */
+a.talk-row { margin: -12px -14px; padding: 12px 14px; border-radius: 16px; text-decoration: none; color: inherit; transition: background-color 220ms var(--ease), transform 200ms var(--ease); }
+a.talk-row .bar { transition: height 300ms var(--ease-out); }
+a.talk-row .bar span { transition: filter 300ms var(--ease); }
+a.talk-row .talk-name { transition: color 220ms var(--ease); }
+
+.week-count { text-decoration: none; color: inherit; border-radius: 12px; transition: color 220ms var(--ease); }
+.chip-link { text-decoration: none; cursor: pointer; transition: background-color 200ms var(--ease), color 200ms var(--ease), box-shadow 200ms var(--ease), transform 160ms var(--ease); }
+.chip-link:active { transform: scale(0.95); }
+
+@media (hover: hover) and (pointer: fine) {
+  .split-legend > a:hover, a.talk-row:hover { background: var(--fill-2); }
+  .split-legend > a:hover svg, a.talk-row:hover .talk-name svg { opacity: 1; transform: none; }
+  a.talk-row:hover .talk-name { color: var(--tone); }
+  a.talk-row:hover .bar { height: 9px; }
+  a.talk-row:hover .bar span { filter: brightness(1.08) saturate(1.15); }
+  .week-count:hover b { color: var(--accent); }
+  .chip-link:hover { background: var(--ink); color: var(--bg); box-shadow: none; }
+}
+/* Touch: show the arrows so rows read as tappable without hover. */
+@media (hover: none) { .split-legend > a svg, .talk-name svg { opacity: 0.6; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ring .arc, .ring-center .rc { transition-duration: 1ms; } }
+.ring .arc.men { color: var(--men); }
+.ring .arc.women { color: var(--women); }
+@media (hover: hover) and (pointer: fine) {
+  .stat-hero:has(.arc-link.men:hover) .legend-link.men, .stat-hero:has(.arc-link.women:hover) .legend-link.women { background: var(--fill-2); }
+  .stat-hero:has(.arc-link.men:hover) .legend-link.men svg, .stat-hero:has(.arc-link.women:hover) .legend-link.women svg { opacity: 1; transform: none; }
+}
