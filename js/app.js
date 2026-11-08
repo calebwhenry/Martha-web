@@ -54,12 +54,14 @@
   function studyColor(key) {
     // First light to sunrise: pre-dawn indigo -> magenta -> coral -> tangerine -> gold
     const s = catalog().find((x) => x.key === key);
-    if (!s) return { c: 'oklch(0.52 0.09 320)', on: '#ffffff' }; // "Other" studies: muted dusk plum
+    if (!s) return { c: 'oklch(0.5 0.03 80)', on: '#ffffff' }; // "Other" studies: warm stone
+    // Pre-dawn ink for the first studies, igniting to ember and then gold as the journey goes on.
     const t = (s.order - 1) / 11;
-    const L = 0.42 + 0.43 * t;
-    const C = 0.16 + 0.06 * Math.sin(Math.PI * t);
-    const H = (285 + 160 * t) % 360;
-    return { c: `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${H.toFixed(1)})`, on: L < 0.64 ? '#ffffff' : '#2a1626' };
+    const ss = (a, b2, x) => { const k = Math.max(0, Math.min(1, (x - a) / (b2 - a))); return k * k * (3 - 2 * k); };
+    const L = 0.3 + 0.5 * t;
+    const C = 0.035 + 0.13 * ss(0.18, 0.5, t);
+    const H = t < 0.3 ? 255 : 32 + 52 * (t - 0.3) / 0.7;
+    return { c: `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${H.toFixed(1)})`, on: L < 0.62 ? '#ffffff' : '#1d1610' };
   }
   const toneVar = (tone) => (tone === 'rose' ? 'var(--rose)' : tone === 'green' ? 'var(--green)' : 'var(--slate)');
 
@@ -1209,7 +1211,9 @@
       </form>
       <p class="signin-foot"><a class="linkish" href="${esc(CFG.telegramBot)}" target="_blank" rel="noopener">Open Martha on Telegram</a></p>`;
     document.getElementById('app').innerHTML = `${API.mode === 'demo' ? `<div class="demo-banner" role="note"><strong>Demo mode.</strong> Everyone and everything here is sample data.</div>` : ''}
-      <div class="signin"><div class="signin-card"><div class="signin-mark"><span class="wordmark"><i></i>Martha</span></div>${body}</div></div>`;
+      <div class="signin"><div class="signin-card"><div class="signin-mark"><span class="wordmark"><i></i>Martha</span></div>
+      <div class="signin-intro"><h1>Every study, remembered.</h1><p>The Bible studies, reports and people of your campus ministry, kept in one quiet place so no one slips through the cracks.</p>
+      <div class="signin-meta"><span>Codes arrive on Telegram</span><span>Private to your ministry</span></div></div>${body}</div></div>`;
 
     if (S.step === 'phone') {
       const inp = $('#si-phone'); inp.focus();
