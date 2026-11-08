@@ -134,14 +134,14 @@
           </div>
         </aside>
         <div style="min-width:0">
-          <header class="topbar" data-refract-mirror data-refract data-refract-source="#view" data-refract-dispersion="0.1" data-refract-blur="16">
+          <header class="topbar">
             <a class="wordmark" href="#home"><i></i>Martha</a>
             <div class="topbar-right">${chapterControl()}<button class="avatar" data-action="account" aria-label="Account">${esc(initials(state.me.displayName))}</button></div>
           </header>
           <main class="main" id="main"><div class="container" id="view"></div></main>
         </div>
       </div>
-      <nav class="tabbar" aria-label="Main" data-refract-mirror data-refract="1.2" data-refract-source="#view" data-refract-dispersion="0.14" data-refract-blur="16"><div class="tab-items" id="tab-items">${links()}</div><span class="tab-lens" aria-hidden="true" data-refract-mirror data-refract="1" data-refract-source="#tab-items" data-refract-blur="0.25" data-refract-dispersion="0.16" data-refract-bezel="9"></span></nav>`;
+      <nav class="tabbar" aria-label="Main">${links()}</nav>`;
   }
 
   // ---------- loading / error ----------
