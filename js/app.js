@@ -5,10 +5,8 @@
   const label = window.MarthaStudyLabel;
 
   // ---------- utilities ----------
-  // Liquid Glass bars hold an inert, bent copy of the page; lookups must never land in it.
-  const real = (n) => !n.closest('.lg-refract-mirror');
-  const $ = (s, el = document) => { const n = el.querySelector(s); return !n || real(n) ? n : [...el.querySelectorAll(s)].find(real) || null; };
-  const $$ = (s, el = document) => [...el.querySelectorAll(s)].filter(real);
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
   const ls = {
