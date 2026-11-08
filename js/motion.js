@@ -131,6 +131,7 @@
   document.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
     pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; lastMove = performance.now();
+    light();
     if (pointer.sx < -999) { pointer.sx = pointer.x; pointer.sy = pointer.y; }
     wake();
     const t = e.target instanceof Element ? e.target : null;
@@ -184,8 +185,9 @@
   addEventListener('hashchange', () => { ripple(innerWidth < 860 ? innerWidth / 2 : 260, 140, 1.2, { speed: 0.9, width: 40, life: 1900 }); });
 
   // ---------------- Enhancements applied to whatever the app renders ----------------
+  const live = (root, sel) => [...root.querySelectorAll(sel)].filter((el) => !el.closest('.lg-refract-mirror'));
   function navIndicators(root) {
-    root.querySelectorAll('.nav').forEach((nav) => {
+    live(root, '.nav').forEach((nav) => {
       if (nav.dataset.mo) return; nav.dataset.mo = '1';
       const ind = document.createElement('span'); ind.className = 'nav-ind';
       const hov = document.createElement('span'); hov.className = 'nav-hover';
@@ -212,11 +214,17 @@
     const on = seg.querySelector(':scope > button[aria-pressed="true"]');
     if (!thumb) return;
     if (!on) { thumb.style.width = '0px'; return; }
+    const x = on.offsetLeft, prevX = Number(thumb.dataset.x);
     thumb.style.width = `${on.offsetWidth}px`;
-    thumb.style.transform = `translateX(${on.offsetLeft}px)`;
+    thumb.style.transform = `translateX(${x}px)`;
+    if (Number.isFinite(prevX) && prevX !== x && !reduce.matches && thumb.animate) {
+      const k = Math.min(0.28, Math.abs(x - prevX) / 400 + 0.1);
+      thumb.animate([{ scale: '1 1' }, { scale: `${1 + k} ${1 - k * 0.45}`, offset: 0.35 }, { scale: '1 1' }], { duration: 560, easing: 'cubic-bezier(0.3, 1, 0.5, 1)' });
+    }
+    thumb.dataset.x = String(x);
   }
   function segThumbs(root) {
-    root.querySelectorAll('.seg').forEach((seg) => {
+    live(root, '.seg').forEach((seg) => {
       if (seg.querySelector(':scope > .seg-thumb')) { placeThumb(seg); return; }
       const thumb = document.createElement('span'); thumb.className = 'seg-thumb'; thumb.setAttribute('aria-hidden', 'true');
       thumb.style.transition = 'none';
@@ -227,7 +235,7 @@
   }
 
   function splitHeadlines(root) {
-    root.querySelectorAll('.page-head h1, .person-head h1, .signin-intro h1, .signin .panel h1').forEach((h) => {
+    live(root, '.page-head h1, .person-head h1, .signin-intro h1, .signin .panel h1').forEach((h) => {
       if (h.dataset.split || h.children.length) return;
       const text = h.textContent;
       if (!text.trim()) return;
@@ -242,7 +250,7 @@
 
   function countUps(root) {
     if (reduce.matches) return;
-    root.querySelectorAll('.stat-hero .big, .split-legend b, .talk-row-top b, .week-count b').forEach((el) => {
+    live(root, '.stat-hero .big, .split-legend b, .talk-row-top b, .week-count b').forEach((el) => {
       if (el.dataset.counted) return;
       const n = Number(el.textContent.trim());
       el.dataset.counted = '1';
@@ -259,7 +267,8 @@
   }
 
   function marks(root) {
-    root.querySelectorAll('.btn:not(.block):not(.quiet), .icon-btn, .avatar[data-action], .account-btn .avatar').forEach((b) => { if (!b.hasAttribute('data-mag')) b.setAttribute('data-mag', ''); });
+    live(root, '.btn:not(.block):not(.quiet), .icon-btn, .avatar[data-action], .account-btn .avatar').forEach((b) => { if (!b.hasAttribute('data-mag')) b.setAttribute('data-mag', ''); });
+
     root.querySelectorAll('.node:not(.next) .node-card').forEach((c) => { if (!c.hasAttribute('data-tilt')) c.setAttribute('data-tilt', '7'); });
     root.querySelectorAll('.stat-hero').forEach((c) => { if (!c.hasAttribute('data-tilt')) c.setAttribute('data-tilt', '3'); });
     root.querySelectorAll('.journey-track > .node').forEach((n, k) => n.style.setProperty('--n', k));
@@ -272,7 +281,134 @@
   function enhance() {
     const root = document.getElementById('app');
     if (!root) return;
-    navIndicators(root); segThumbs(root); splitHeadlines(root); countUps(root); marks(root);
+    navIndicators(root); segThumbs(root); splitHeadlines(root); countUps(root); marks(root); tabLens(root);
+    glassList = live(document, GLASS);
+    if (window.LiquidGlassRefraction) window.LiquidGlassRefraction.refresh();
+    light();
+  }
+
+  // ---------------- Light: rims and sheens face the pointer ----------------
+  const GLASS = '.tabbar, .topbar, .tab-lens, .btn:not(.quiet), .icon-btn, .chapter-switch, .toggle, .seg, .end-btn, .row-end-btn, .avatar[data-action], .toast, .nav-ind, .combo-list';
+  let glassList = [];
+  let lightQueued = false;
+  function light() {
+    if (lightQueued) return; lightQueued = true;
+    requestAnimationFrame(() => {
+      lightQueued = false;
+      const hasPointer = pointer.active && pointer.x > -999;
+      const lx = hasPointer ? pointer.x : innerWidth * 0.25;
+      const ly = hasPointer ? pointer.y : -innerHeight * 0.4 + Math.sin(scrollY / 260) * 120;
+      for (const el of glassList) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom < -40 || r.top > innerHeight + 40 || !r.width) continue;
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const ang = Math.atan2(cx - lx, -(cy - ly)) * 180 / Math.PI;
+        el.style.setProperty('--la', `${ang.toFixed(1)}deg`);
+        el.style.setProperty('--sx', `${clamp(((lx - r.left) / r.width) * 100, -30, 130).toFixed(1)}%`);
+        el.style.setProperty('--sy', `${clamp(((ly - r.top) / r.height) * 100, -60, 160).toFixed(1)}%`);
+      }
+    });
+  }
+  addEventListener('scroll', light, { passive: true });
+
+  // ---------------- The tab bar lens ----------------
+  // Rests under the selected tab. Press anywhere on the bar and it swells and slides there;
+  // drag and it follows your finger, stretching with speed; let go and it springs to the nearest tab.
+  function tabLens(root) {
+    const bar = root.querySelector('.tabbar');
+    if (!bar || bar.dataset.lens) return;
+    const lens = bar.querySelector('.tab-lens');
+    const items = bar.querySelector('.tab-items');
+    if (!lens || !items) return;
+    bar.dataset.lens = '1';
+    items.querySelectorAll('a').forEach((a) => a.setAttribute('draggable', 'false'));
+    bar.addEventListener('dragstart', (e) => e.preventDefault());
+    const links = () => [...items.querySelectorAll(':scope > a')];
+    const geom = () => { const b = bar.getBoundingClientRect(); return links().map((a) => { const r = a.getBoundingClientRect(); return { a, x: r.left - b.left, w: r.width, c: r.left - b.left + r.width / 2 }; }); };
+    const set = (x, sx = 1, sy = 1) => { lens.style.setProperty('--lx', `${x.toFixed(1)}px`); lens.style.setProperty('--lsx', sx.toFixed(3)); lens.style.setProperty('--lsy', sy.toFixed(3)); };
+    const place = (animate) => {
+      const g = geom(); if (!g.length) return;
+      const cur = g.find((t) => t.a.getAttribute('aria-current') === 'page') || g[0];
+      lens.style.width = `${cur.w}px`;
+      const prev = Number(sessionStorage.getItem('martha.lensX'));
+      if (animate && Number.isFinite(prev) && prev !== cur.x && !reduce.matches) {
+        bar.classList.add('settling'); lens.style.transition = 'none'; set(prev);
+        requestAnimationFrame(() => requestAnimationFrame(() => { lens.style.transition = ''; set(cur.x); setTimeout(() => bar.classList.remove('settling'), 650); }));
+      } else set(cur.x);
+      try { sessionStorage.setItem('martha.lensX', String(cur.x)); } catch { /* ignore */ }
+    };
+    requestAnimationFrame(() => place(true));
+    addEventListener('resize', () => { if (bar.isConnected) place(false); }, { passive: true });
+
+    let drag = null, swallowClick = 0;
+    const under = (cx) => {
+      const g = geom(); let best = g[0];
+      for (const t of g) if (Math.abs(t.c - cx) < Math.abs(best.c - cx)) best = t;
+      g.forEach((t) => t.a.classList.toggle('under', t === best));
+      return best;
+    };
+    let lastUnder = null;
+    const refreshLensMirror = (best) => {
+      if (best !== lastUnder && window.LiquidGlassRefraction && window.LiquidGlassRefraction.modeOf(lens) === 'mirror') window.LiquidGlassRefraction.rebuild((el) => el === lens);
+      lastUnder = best;
+    };
+    bar.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      const g = geom(); if (!g.length) return;
+      const b = bar.getBoundingClientRect();
+      const w = g[0].w; const px = e.clientX - b.left;
+      drag = { id: e.pointerId, w, startX: e.clientX, lastX: e.clientX, lastT: performance.now(), v: 0, moved: false, min: g[0].x, max: g[g.length - 1].x };
+      bar.setPointerCapture(e.pointerId);
+      bar.classList.add('pressing');
+      lens.style.width = `${w}px`;
+      const x = clamp(px - w / 2, drag.min, drag.max);
+      set(x, 1.16, 1.16);
+      refreshLensMirror(under(x + w / 2));
+    });
+    bar.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const b = bar.getBoundingClientRect();
+      const now = performance.now(); const dt = Math.max(8, now - drag.lastT);
+      drag.v = drag.v * 0.6 + ((e.clientX - drag.lastX) / dt) * 0.4;
+      drag.lastX = e.clientX; drag.lastT = now;
+      if (Math.abs(e.clientX - drag.startX) > 6) { drag.moved = true; bar.classList.add('dragging'); }
+      const raw = e.clientX - b.left - drag.w / 2;
+      // Rubber-band past the ends, like iOS.
+      const over = raw < drag.min ? raw - drag.min : raw > drag.max ? raw - drag.max : 0;
+      const x = clamp(raw, drag.min, drag.max) + over * 0.25;
+      const st = Math.min(0.32, Math.abs(drag.v) * 0.22);
+      set(x, 1.16 + st, 1.16 - st * 0.4);
+      lens.style.setProperty('--sx', `${clamp(50 + drag.v * 40, 0, 100)}%`);
+      refreshLensMirror(under(x + drag.w / 2));
+    });
+    const end = (e, cancel) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const b = bar.getBoundingClientRect();
+      const best = under(clamp(e.clientX - b.left, 0, b.width));
+      bar.classList.remove('dragging', 'pressing'); bar.classList.add('settling');
+      set(best.x);
+      setTimeout(() => bar.classList.remove('settling'), 650);
+      try { sessionStorage.setItem('martha.lensX', String(best.x)); } catch { /* ignore */ }
+      drag = null; swallowClick = performance.now();
+      if (!cancel) {
+        const href = best.a.getAttribute('href');
+        if (href && location.hash !== href) setTimeout(() => { location.hash = href; }, reduce.matches ? 0 : 140);
+        else links().forEach((a) => a.classList.remove('under'));
+      }
+    };
+    bar.addEventListener('pointerup', (e) => end(e, false));
+    bar.addEventListener('pointercancel', (e) => end(e, true));
+    // The pointer handler navigates; swallow the native click it would otherwise produce. Keyboard clicks still work.
+    bar.addEventListener('click', (e) => { if (performance.now() - swallowClick < 600) e.preventDefault(); }, true);
+  }
+
+  // Keep the bent page copies (Safari/Firefox mirror mode) in step with what the app renders.
+  let rebuildTimer = 0;
+  function scheduleRebuild() {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(() => {
+      if (window.LiquidGlassRefraction) window.LiquidGlassRefraction.rebuild((el) => el.getAttribute('data-refract-source') === '#view');
+    }, 260);
   }
 
   let queued = false;
@@ -280,7 +416,12 @@
   const mo = new MutationObserver((list) => {
     for (const m of list) {
       if (m.type === 'attributes' && m.target.parentElement && m.target.parentElement.classList.contains('seg')) { placeThumb(m.target.parentElement); continue; }
-      if (m.type === 'childList') { queue(); }
+      if (m.type === 'childList') {
+        const t = m.target instanceof Element ? m.target : null;
+        if (t && t.closest('.lg-refract-mirror, .lg-refract-tint')) continue;
+        queue();
+        if (t && t.closest('#view')) scheduleRebuild();
+      }
     }
   });
   function start() {
