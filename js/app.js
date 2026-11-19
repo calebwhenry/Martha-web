@@ -981,7 +981,7 @@
       </div>
       <div class="form-grid">
         <div class="field"><label for="sf-date-${compact ? 'c' : 'p'}">Date</label><input class="input" type="date" id="sf-date-${compact ? 'c' : 'p'}" name="date" value="${defaultDate()}" required></div>
-        <div class="field"><label for="sf-time-${compact ? 'c' : 'p'}">Start time</label><input class="input" type="time" id="sf-time-${compact ? 'c' : 'p'}" name="time" value="19:00" step="900" required></div>
+        <div class="field"><label for="sf-time-${compact ? 'c' : 'p'}">Start time</label><input class="input" type="time" id="sf-time-${compact ? 'c' : 'p'}" name="time" value="19:00" step="60" required></div>
         <div class="field"><label for="sf-len-${compact ? 'c' : 'p'}">Length</label>
           <select class="input" id="sf-len-${compact ? 'c' : 'p'}" name="minutes">${[30, 45, 60, 75, 90, 105, 120, 150, 180].map((m) => `<option value="${m}" ${m === minutes ? 'selected' : ''}>${lenLabel(m)}</option>`).join('')}</select></div>
         <div class="field"><label for="sf-loc-${compact ? 'c' : 'p'}">Where <span class="muted" style="font-weight:450">(optional)</span></label><input class="input" id="sf-loc-${compact ? 'c' : 'p'}" name="location" placeholder="Bell Tower, HUB…" autocomplete="off"></div>
